@@ -34,8 +34,8 @@ def parse_arguments():
     p.add_argument("-sz",   "--hidden_size",   type=int,   nargs="+", default=[128, 128, 128])
     p.add_argument("-a",    "--activation",    type=str,   default="tanh",
                    choices=["relu", "sigmoid", "tanh"])
-    p.add_argument("-w_i",  "--weight_init",   type=str,   default="xavier",
-                   choices=["xavier", "random"])
+    p.add_argument("-w_i", "--weight_init", type=str, default="xavier",
+               choices=["xavier", "random", "zeros"])
     p.add_argument("-w_p",  "--wandb_project", type=str,   default="da6401_a1")
     p.add_argument("--wandb_entity",           type=str,   default=None)
     p.add_argument("--no_wandb",               action="store_true")

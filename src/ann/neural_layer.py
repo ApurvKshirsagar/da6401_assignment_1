@@ -37,6 +37,8 @@ class NeuralLayer:
             self.W = np.random.randn(self.input_size, self.output_size) * scale
         elif method == "random":
             self.W = np.random.randn(self.input_size, self.output_size) * 0.01
+        elif method == "zeros":
+            self.W = np.zeros((self.input_size, self.output_size))
         else:
             raise ValueError(
                 f"Unknown weight_init '{method}'. Choose 'xavier' or 'random'."

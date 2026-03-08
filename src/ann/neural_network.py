@@ -121,8 +121,9 @@ class NeuralNetwork:
     ):
         epochs     = epochs     or getattr(self.cli_args, "epochs",     20)
         batch_size = batch_size or getattr(self.cli_args, "batch_size", 64)
-        N       = X_train.shape[0]
-        history = {"train_loss": [], "val_loss": [], "val_acc": []}
+        N           = X_train.shape[0]
+        global_step = 0
+        history     = {"train_loss": [], "val_loss": [], "val_acc": []}
 
         for epoch in range(1, epochs + 1):
             perm = np.random.permutation(N)
@@ -136,6 +137,15 @@ class NeuralNetwork:
                 loss, _ = self._optimizer_step(X_batch, y_batch)
                 epoch_loss  += loss
                 num_batches += 1
+
+                if wandb_run is not None and global_step < 50:
+                    grad_log = {"step": global_step}
+                    for n in range(5):
+                        grad_log[f"neuron_{n}_grad_norm"] = float(
+                            np.linalg.norm(self.layers[0].grad_W[:, n])
+                        )
+                    wandb_run.log(grad_log)
+                global_step += 1
 
             avg_train_loss = epoch_loss / num_batches
             history["train_loss"].append(avg_train_loss)
