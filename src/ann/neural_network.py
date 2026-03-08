@@ -34,25 +34,13 @@ class NeuralNetwork:
         self.layers.append(DenseLayer(prev, out_dim, activation="none", w_init=w_init))
 
     def forward(self, X):
-        """
-        Forward propagation through all layers.
-        Returns logits (no softmax applied)
-        X is shape (b, D_in) and output is shape (b, D_out).
-        b is batch size, D_in is input dimension, D_out is output dimension.
-        """
         a = X
         for layer in self.layers:
             a = layer.forward(a)
         return a   # Raw logits
 
 
-    def backward(self,grad_logits):
-        """
-        Backward propagation to compute gradients.
-        Returns two numpy arrays: grad_Ws, grad_bs.
-        - `grad_Ws[0]` is gradient for the last (output) layer weights,
-          `grad_bs[0]` is gradient for the last layer biases, and so on.
-        """
+    def backward(self,grad_logits,y=None):
         grad_W_list = []
         grad_b_list = []
 
