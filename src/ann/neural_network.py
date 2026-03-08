@@ -39,37 +39,21 @@ class NeuralNetwork:
             a = layer.forward(a)
         return a   # Raw logits
 
+    def backward(self, y_true, y_pred=None):
+        if y_pred is not None:
+            # autograder style: backward(y_true, logits)
+            N = y_pred.shape[0]
+            probs = np.exp(y_pred - y_pred.max(axis=1, keepdims=True))
+            probs /= probs.sum(axis=1, keepdims=True)
+            grad = probs.copy()
+            grad[np.arange(N), y_true] -= 1.0
+            grad /= N
+        else:
+            # train.py style: backward(grad)
+            grad = y_true
 
-    # def backward(self,grad_logits,y=None):
-    #     grad_W_list = []
-    #     grad_b_list = []
-
-    #     # Backprop through layers in reverse; collect grads so that index 0 = last layer
-    #     grad = grad_logits
-    #     for layer in reversed(self.layers):
-    #         grad = layer.backward(grad)
-    #         grad_W_list.append(layer.grad_W)
-    #         grad_b_list.append(layer.grad_b)
-
-    #     # create explicit object arrays to avoid numpy trying to broadcast shapes
-    #     self.grad_W = np.empty(len(grad_W_list), dtype=object)
-    #     self.grad_b = np.empty(len(grad_b_list), dtype=object)
-    #     for i, (gw, gb) in enumerate(zip(grad_W_list, grad_b_list)):
-    #         self.grad_W[i] = gw
-    #         self.grad_b[i] = gb
-
-    #     # print("Shape of grad_Ws:", self.grad_W.shape, self.grad_W[1].shape)
-    #     # print("Shape of grad_bs:", self.grad_b.shape, self.grad_b[1].shape)
-    #     return self.grad_W, self.grad_b
-
-    def backward(self, grad_logits, y=None):
-        if isinstance(grad_logits, tuple):
-            grad_logits = grad_logits[0]
-
-        grad = grad_logits
         for layer in reversed(self.layers):
             grad = layer.backward(grad)
-            
         return grad
 
     def update_weights(self,optimizer):
