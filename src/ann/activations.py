@@ -50,20 +50,15 @@ class Tanh:
         return dA*deriv
 
 class Softmax:
-    def __init__(self):
-        self.val = None
-
-    def forward(self,X):
-        #Since exponentails can get pretty large we shift for numerical stability
-        X_shifted= X - np.max(X,axis=1, keepdims=True)
-        expo_vals = np.exp(X_shifted)
-
-        self.val = expo_vals / np.sum(expo_vals,axis=1,keepdims=True)
-        return self.val
+    def forward(self, Z):
+        Z_stable = Z - np.max(Z, axis=1, keepdims=True)
+        exp_Z = np.exp(Z_stable)
+        self.A = exp_Z / np.sum(exp_Z, axis=1, keepdims=True)
+        return self.A
 
     def backward(self, dA):
-        #Softmax derivative uses Jacobian matrix ..directly defined in loss functions so did not write here
-        pass
+        s = np.sum(dA * self.A, axis=1, keepdims=True)  # (N, 1)
+        return self.A * (dA - s)
 
 class Identity:
     def forward(self, X):
