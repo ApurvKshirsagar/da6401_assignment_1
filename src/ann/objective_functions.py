@@ -13,13 +13,26 @@ class CrossEntropyLoss: #Categorical Cross-Entropy
         self.y_true = None
         self.probs = None
 
-    def forward(self,X, y_true):
-        #X is logits
+    # def forward(self,X, y_true):
+    #     #X is logits
+    #     self.probs = self.softmax.forward(X)
+    #     self.y_true = y_true
+    #     batch = y_true.shape[0]
+    #     correct = self.probs[np.arange(batch),y_true]
+    #     return -np.log(correct + 1e-9).mean() #1e-9 is added to prevent log(0) from blowing up to -infinity
+
+    def forward(self, X, y_true):
+        # ensure X is 2D
+        if X.ndim == 1:
+            X = X.reshape(1, -1)
+        # ensure y_true is 1D array
+        y_true = np.atleast_1d(np.array(y_true))
+        
         self.probs = self.softmax.forward(X)
         self.y_true = y_true
         batch = y_true.shape[0]
-        correct = self.probs[np.arange(batch),y_true]
-        return -np.log(correct + 1e-9).mean() #1e-9 is added to prevent log(0) from blowing up to -infinity
+        correct = self.probs[np.arange(batch), y_true]
+        return -np.log(correct + 1e-9).mean()
 
     def backward(self): 
         #The actual derivate of softmax is complex, but when we use crossentropy with softmax, most things cancels and remaining term is simple
@@ -36,13 +49,27 @@ class MSELoss:
         self.probs = None
         self.diff = None
 
+    # def forward(self, X, y_true):
+    #     self.probs = self.softmax.forward(X)
+    #     batch, n_classes = X.shape
+    #     # OneHot Matrix: 
+    #     one_hot = np.zeros((batch, n_classes))
+    #     one_hot[np.arange(batch), y_true] = 1.0
+    #     #Difference between prediction and target
+    #     self.diff = self.probs - one_hot
+    #     return (self.diff ** 2).mean()
+
     def forward(self, X, y_true):
+        # ensure X is 2D
+        if X.ndim == 1:
+            X = X.reshape(1, -1)
+        # ensure y_true is 1D array
+        y_true = np.atleast_1d(np.array(y_true))
+
         self.probs = self.softmax.forward(X)
-        batch, n_classes = X.shape
-        # OneHot Matrix: 
+        batch, n_classes = self.probs.shape
         one_hot = np.zeros((batch, n_classes))
         one_hot[np.arange(batch), y_true] = 1.0
-        #Difference between prediction and target
         self.diff = self.probs - one_hot
         return (self.diff ** 2).mean()
 
