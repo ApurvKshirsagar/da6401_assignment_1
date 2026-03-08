@@ -2,40 +2,74 @@
 Neural Layer Implementation
 Handles weight initialization, forward pass, and gradient computation
 """
-
 #Libraries
-import numpy as np 
+import numpy as np
 from ann.activations import get_activation
 
-class DenseLayer:
-    def __init__(self, in_dim, out_dim,activation="relu", w_init="random"):
-        # Either xavier or random initialistion
-        if(w_init == "xavier"):
-            limit = np.sqrt(6.0 / (in_dim + out_dim))
-            self.W = np.random.uniform(-limit, limit, (in_dim, out_dim))
-        else:
-            multi = 0.01  #To ensure small values
-            self.W = np.random.randn(in_dim,out_dim) * multi
 
-        self.b = np.zeros((1, out_dim))
-        self.X = None
+class NeuralLayer:
+
+    def __init__(self, input_size, output_size, activation=None, weight_init="xavier"):
+        self.input_size = input_size
+        self.output_size = output_size
+        self.activation_name = activation if activation else "linear"
+
+        if activation and activation.lower() not in ("none", "linear", "identity", ""):
+            self.activation = get_activation(activation)
+        else:
+            self.activation = None  
+
+        # Weight Initialization 
+        self._init_weights(weight_init)
+
         self.grad_W = None
         self.grad_b = None
-        self.activation = get_activation(activation) 
 
-    def forward(self, X):
-        if X.ndim == 1:
-            X = X.reshape(1, -1)
-        self.X = X
-        Z = np.dot(X, self.W) + self.b
-        return self.activation.forward(Z)
+        # Forward-pass cache
+        self.X = None   # input to this layer
+        self.Z = None   # pre-activation 
+        self.A = None   # post-activation output
 
-    def backward(self, dA):
-        if dA.ndim == 1:
-            dA = dA.reshape(1, -1)
-        dZ = self.activation.backward(dA)
-        m = self.X.shape[0]
-        self.grad_W = np.dot(self.X.T, dZ) / m
-        self.grad_b = np.sum(dZ, axis=0, keepdims=True) / m
-        dX = np.dot(dZ, self.W.T)
+    def _init_weights(self, method: str):
+
+        if method == "xavier":
+            scale = np.sqrt(2.0 / (self.input_size + self.output_size))
+            self.W = np.random.randn(self.input_size, self.output_size) * scale
+        elif method == "random":
+            self.W = np.random.randn(self.input_size, self.output_size) * 0.01
+        else:
+            raise ValueError(
+                f"Unknown weight_init '{method}'. Choose 'xavier' or 'random'."
+            )
+        self.b = np.zeros((1, self.output_size))
+
+    # Forward pass
+    def forward(self, X: np.ndarray) -> np.ndarray:
+
+        self.X = X  # cache input for backward
+        self.Z = X @ self.W + self.b
+
+        if self.activation is not None:
+            self.A = self.activation.forward(self.Z)
+        else:
+            self.A = self.Z                
+
+        return self.A
+
+    # Backward pass
+    def backward(self, dA: np.ndarray) -> np.ndarray:
+
+        batch_size = self.X.shape[0]
+
+        if self.activation is not None:
+            dZ = self.activation.backward(dA)
+        else:
+            dZ = dA
+
+        self.grad_W = (self.X.T @ dZ) / batch_size
+        self.grad_b = np.mean(dZ, axis=0, keepdims=True)
+
+        # Gradient to propagate to the previous layer
+        dX = dZ @ self.W.T 
+
         return dX

@@ -2,105 +2,141 @@
 Optimization Algorithms
 Implements: SGD, Momentum, Adam, Nadam, etc.
 """
-
+#Libraries
 import numpy as np
 
+# Stochastic Gradient Descent (SGD)
 class SGD:
-    def __init__(self, learning_rate=0.01, weight_decay=0.0):
-        self.lr = learning_rate
+
+    def __init__(self, lr: float = 0.01, weight_decay: float = 0.0):
+        self.lr = lr
         self.weight_decay = weight_decay
 
-    def update(self, layers):
-        for layer in layers:
-            grad_W = layer.grad_W + self.weight_decay * layer.W #L2 regularisation
-            #Move in the opp side of the gradient
-            layer.W -= self.lr * grad_W
-            layer.b -= self.lr * layer.grad_b
+    def step(self, layers, grad_Ws, grad_bs):
+        for i, layer in enumerate(reversed(layers)):
+            eff_gW = grad_Ws[i] + self.weight_decay * layer.W
+            layer.W -= self.lr * eff_gW
+            layer.b -= self.lr * grad_bs[i]
 
+
+# Momentum
 class Momentum:
-    def __init__(self, learning_rate=0.01, beta=0.9, weight_decay=0.0):
-        self.lr = learning_rate
+
+    def __init__(self, lr: float = 0.01, beta: float = 0.9, weight_decay: float = 0.0):
+        self.lr = lr
         self.beta = beta
         self.weight_decay = weight_decay
-        self.velocities = {} #Stores velocities for each layer
+        self.vW = None
+        self.vb = None
 
-    def update(self, layers):
-        for idx, layer in enumerate(layers):
-             # initialise velocity as zeros on first call
-            if idx not in self.velocities:
-                self.velocities[idx] = {
-                    "vW": np.zeros_like(layer.W),
-                    "vb": np.zeros_like(layer.b)
-                }
+    def _init_state(self, grad_Ws, grad_bs):
+        self.vW = [np.zeros_like(g) for g in grad_Ws]
+        self.vb = [np.zeros_like(g) for g in grad_bs]
 
-            v = self.velocities[idx]
-            v["vW"] = self.beta * v["vW"] + (1 - self.beta) * layer.grad_W
-            v["vb"] = self.beta * v["vb"] + (1 - self.beta) * layer.grad_b
+    def step(self, layers, grad_Ws, grad_bs):
+        if self.vW is None:
+            self._init_state(grad_Ws, grad_bs)
 
-            layer.W -= self.lr * (v["vW"] + self.weight_decay * layer.W)
-            layer.b -= self.lr * v["vb"]
+        for i, layer in enumerate(reversed(layers)):
+            eff_gW = grad_Ws[i] + self.weight_decay * layer.W
+            self.vW[i] = self.beta * self.vW[i] - self.lr * eff_gW
+            self.vb[i] = self.beta * self.vb[i] - self.lr * grad_bs[i]
+            layer.W += self.vW[i]
+            layer.b += self.vb[i]
 
 
+# Nesterov Accelerated Gradient (NAG)
 class NAG:
-    def __init__(self, learning_rate=0.01, beta=0.9, weight_decay=0.0):
-        self.lr = learning_rate
+
+    def __init__(self, lr: float = 0.01, beta: float = 0.9, weight_decay: float = 0.0):
+        self.lr = lr
         self.beta = beta
         self.weight_decay = weight_decay
-        self.velocities = {}
+        self.vW = None
+        self.vb = None
+        self._saved_W = None
+        self._saved_b = None
 
-    def update(self, layers):
-        for idx, layer in enumerate(layers):
-            if idx not in self.velocities:
-                self.velocities[idx] = {
-                    "vW": np.zeros_like(layer.W),
-                    "vb": np.zeros_like(layer.b)
-                }
+    def _init_state(self, layers):
+      self.vW = [np.zeros_like(layer.W) for layer in reversed(layers)]
+      self.vb = [np.zeros_like(layer.b) for layer in reversed(layers)]
 
-            v = self.velocities[idx]
+    def apply_lookahead(self, layers):
+        if self.vW is None:
+            self._init_state(layers)
 
-            vW_prev = v["vW"].copy()
-            vb_prev = v["vb"].copy()
+        self._saved_W = [layer.W.copy() for layer in layers]
+        self._saved_b = [layer.b.copy() for layer in layers]
+        for j, layer in enumerate(layers):
+            v_idx = len(layers) - 1 - j
+            layer.W = layer.W + self.beta * self.vW[v_idx]
+            layer.b = layer.b + self.beta * self.vb[v_idx]
 
-            v["vW"] = self.beta * v["vW"] + self.lr * (layer.grad_W + self.weight_decay * layer.W)
-            v["vb"] = self.beta * v["vb"] + self.lr * layer.grad_b
+    def restore_weights(self, layers):
+        for j, layer in enumerate(layers):
+            layer.W = self._saved_W[j]
+            layer.b = self._saved_b[j]
 
-            # nesterov correction: overshoot then pull back
-            layer.W -= (1 + self.beta) * v["vW"] - self.beta * vW_prev
-            layer.b -= (1 + self.beta) * v["vb"] - self.beta * vb_prev
+    def step(self, layers, grad_Ws, grad_bs):
+        if self.vW is None:
+            self._init_state(layers)
+
+        for i, layer in enumerate(reversed(layers)):
+            eff_gW = grad_Ws[i] + self.weight_decay * layer.W
+            self.vW[i] = self.beta * self.vW[i] - self.lr * eff_gW
+            self.vb[i] = self.beta * self.vb[i] - self.lr * grad_bs[i]
+            layer.W += self.vW[i]
+            layer.b += self.vb[i]
 
 
+# RMSProp
 class RMSProp:
-    def __init__(self, learning_rate=0.001, beta=0.9, epsilon=1e-8, weight_decay=0.0):
-        self.lr = learning_rate
-        self.beta = beta
-        self.eps = epsilon  #Prevents division by zero
+
+    def __init__(
+        self, lr: float = 0.001, rho: float = 0.9,
+        eps: float = 1e-8, weight_decay: float = 0.0
+    ):
+        self.lr = lr
+        self.rho = rho
+        self.eps = eps
         self.weight_decay = weight_decay
-        self.cache = {}
+        self.sW = None
+        self.sb = None
 
-    def update(self, layers):
-        for idx, layer in enumerate(layers):
-            if idx not in self.cache:
-                self.cache[idx] = {
-                    "sW": np.zeros_like(layer.W),
-                    "sb": np.zeros_like(layer.b)
-                }
+    def _init_state(self, grad_Ws, grad_bs):
+        self.sW = [np.zeros_like(g) for g in grad_Ws]
+        self.sb = [np.zeros_like(g) for g in grad_bs]
 
-            s = self.cache[idx]
-            grad_W = layer.grad_W + self.weight_decay * layer.W
+    def step(self, layers, grad_Ws, grad_bs):
+        if self.sW is None:
+            self._init_state(grad_Ws, grad_bs)
 
-            s["sW"] = self.beta * s["sW"] + (1 - self.beta) * grad_W ** 2
-            s["sb"] = self.beta * s["sb"] + (1 - self.beta) * layer.grad_b ** 2
+        for i, layer in enumerate(reversed(layers)):
+            eff_gW = grad_Ws[i] + self.weight_decay * layer.W
+            self.sW[i] = self.rho * self.sW[i] + (1.0 - self.rho) * eff_gW ** 2
+            self.sb[i] = self.rho * self.sb[i] + (1.0 - self.rho) * grad_bs[i] ** 2
+            layer.W -= self.lr * eff_gW / (np.sqrt(self.sW[i]) + self.eps)
+            layer.b -= self.lr * grad_bs[i] / (np.sqrt(self.sb[i]) + self.eps)
 
-            layer.W -= self.lr * grad_W / (np.sqrt(s["sW"]) + self.eps)
-            layer.b -= self.lr * layer.grad_b / (np.sqrt(s["sb"]) + self.eps)
 
-def get_optimizer(name, learning_rate, weight_decay=0.0):
-    opts = {
-        "sgd":      SGD(learning_rate, weight_decay),
-        "momentum": Momentum(learning_rate, weight_decay=weight_decay),
-        "nag":      NAG(learning_rate, weight_decay=weight_decay),
-        "rmsprop":  RMSProp(learning_rate, weight_decay=weight_decay),
-    }
-    if name not in opts:
-        raise ValueError(f"Unknown optimizer '{name}'. Choose from: {list(opts.keys())}")
-    return opts[name]
+
+def get_optimizer(name: str, lr: float, weight_decay: float = 0.0, **kwargs):
+
+    name = name.lower().strip()
+    if name == "sgd":
+        return SGD(lr=lr, weight_decay=weight_decay)
+    elif name == "momentum":
+        beta = kwargs.get("beta", 0.9)
+        return Momentum(lr=lr, beta=beta, weight_decay=weight_decay)
+    elif name == "nag":
+        beta = kwargs.get("beta", 0.9)
+        return NAG(lr=lr, beta=beta, weight_decay=weight_decay)
+    elif name == "rmsprop":
+        rho = kwargs.get("rho", 0.9)
+        eps = kwargs.get("eps", 1e-8)
+        return RMSProp(lr=lr, rho=rho, eps=eps, weight_decay=weight_decay)
+    else:
+        raise ValueError(
+            f"Unknown optimizer '{name}'. "
+            f"Choose from: sgd, momentum, nag, rmsprop"
+        )

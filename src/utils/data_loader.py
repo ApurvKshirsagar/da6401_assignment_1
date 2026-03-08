@@ -2,43 +2,43 @@
 Data Loading and Preprocessing
 Handles MNIST and Fashion-MNIST datasets
 """
+#Libraries
 import numpy as np
-from keras.datasets import mnist, fashion_mnist
-from sklearn.model_selection import train_test_split
 
-def load_data(dataset_name, validation_split=0.1, random_state=42):
-    if dataset_name == "mnist":
-        (X_train, y_train), (X_test, y_test) = mnist.load_data()
-    elif dataset_name == "fashion_mnist":
-        (X_train, y_train), (X_test, y_test) = fashion_mnist.load_data()
+FASHION_LABELS = [
+    "T-shirt/top", "Trouser", "Pullover", "Dress", "Coat",
+    "Sandal",      "Shirt",   "Sneaker",  "Bag",   "Ankle boot",
+]
+MNIST_LABELS = [str(i) for i in range(10)]
+
+
+def load_dataset(name, val_split=0.1, seed=42):
+    name = name.lower().strip()
+
+    if name == "mnist":
+        from keras.datasets import mnist
+        (X_tr, y_tr), (X_te, y_te) = mnist.load_data()
+        labels = MNIST_LABELS
+    elif name in ("fashion_mnist", "fashion-mnist"):
+        from keras.datasets import fashion_mnist
+        (X_tr, y_tr), (X_te, y_te) = fashion_mnist.load_data()
+        labels = FASHION_LABELS
     else:
-        raise ValueError("dataset_name must be 'mnist' or 'fashion_mnist'")
+        raise ValueError(f"Unknown dataset '{name}'. Use 'mnist' or 'fashion_mnist'.")
 
-    # Normalize to [0,1]
-    X_train = X_train.astype(np.float32) / 255.0
-    X_test = X_test.astype(np.float32) / 255.0
+    # flatten + normalise
+    X_tr = X_tr.reshape(-1, 784).astype(np.float64) / 255.0
+    X_te = X_te.reshape(-1, 784).astype(np.float64) / 255.0
+    y_tr = y_tr.astype(np.int64)
+    y_te = y_te.astype(np.int64)
 
-    # Flatten (N, 28, 28) → (N, 784)
-    X_train = X_train.reshape(X_train.shape[0], -1)
-    X_test = X_test.reshape(X_test.shape[0], -1)
+    # train / val split
+    rng      = np.random.default_rng(seed)
+    n_val    = int(len(X_tr) * val_split)
+    shuffled = rng.permutation(len(X_tr))
 
-    # Train / Validation split
-    X_train, X_val, y_train, y_val = train_test_split(
-        X_train, y_train,
-        test_size=validation_split,
-        random_state=random_state,
-        shuffle=True
-    )
+    X_val,   y_val   = X_tr[shuffled[:n_val]],  y_tr[shuffled[:n_val]]
+    X_train, y_train = X_tr[shuffled[n_val:]],  y_tr[shuffled[n_val:]]
 
-    return X_train, y_train, X_val, y_val, X_test, y_test
-
-def create_batches(X, y, batch_size):
-    num_samples = X.shape[0]
-    indices = np.arange(num_samples)
-    np.random.shuffle(indices)
-
-    X = X[indices]
-    y = y[indices]
-
-    for start in range(0, num_samples, batch_size):
-        yield X[start : start + batch_size], y[start : start + batch_size]
+    print(f"[Data] {name}  train={len(X_train)}  val={len(X_val)}  test={len(X_te)}")
+    return X_train, y_train, X_val, y_val, X_te, y_te, labels

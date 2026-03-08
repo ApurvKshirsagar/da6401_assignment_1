@@ -1,3 +1,3 @@
 # Utility modules for shared, reusable helper functions and small components used across the project
 
-from .data_loader import load_data, create_batches
+from .data_loader import load_dataset

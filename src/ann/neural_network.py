@@ -2,7 +2,7 @@
 Main Neural Network Model
 Orchestrates layers, forward propagation, backward propagation, and training.
 """
-
+#Libraries
 import numpy as np
 from ann.neural_layer import NeuralLayer
 from ann.objective_functions import get_loss
@@ -10,19 +10,7 @@ from ann.optimizers import get_optimizer, NAG
 
 
 class NeuralNetwork:
-    """
-    Neural Network class
-    Handles forward and backward propagation loops
-    """
     def __init__(self, cli_args):
-        """
-        Build the network from CLI arguments.
-
-        Args:
-            cli_args: argparse.Namespace with all configuration fields.
-                      Uses getattr with safe defaults for every field so
-                      the autograder can pass a minimal Namespace without crashing.
-        """
         self.cli_args = cli_args
         self.layers   = []
 
